@@ -1,0 +1,40 @@
+# ===== 비밀 / 핵심 자산 (절대 커밋 금지) =====
+.env
+.env.*
+private_assets/
+
+# ===== 개인 데이터 (유저 영상·접수·분석 결과) =====
+inbox/
+results/
+수영동영상들/
+배영 프레임/
+접영프레임/
+
+# ===== 프롬프트 연구 원문·내부 문서 (카피캣 방지) =====
+MASTER_prompt_swim_*.md
+prompt_v0*.md
+swim_coaching_prompt_*.md
+system_prompt.md
+coaching_schema_*.json
+*리포트*
+*위키*
+HANDOFF*.md
+analyze.py
+swim_analyze.py
+
+# ===== 빌드 / 환경 =====
+node_modules/
+swim-web/dist/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
+
+# ===== 추가 보안 권장 항목 =====
+*.log
+.venv/
+venv/
+*.egg-info/
+.env.local
+security_report_*.md
+

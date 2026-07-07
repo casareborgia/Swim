@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+html {
+  font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+}
