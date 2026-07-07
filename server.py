@@ -256,7 +256,7 @@ async def submit(
     # 5) 모든 검증 통과 후에만 크레딧 차감 + 분석 시작
     consume_credit(email)
     background_tasks.add_task(process_submission, sub_id)
-    return {"id": sub_id, "message": "접수 완료. 검수 후 24시간 내 이메일로 발송됩니다."}
+    return {"id": sub_id, "message": "접수 완료. AI 분석 진행 후 24시간 내 이메일로 발송됩니다."}
 
 
 # ---------- 관리자(검수) ----------

@@ -115,7 +115,7 @@ def render_markdown(agg, data):
     ap("")
     ap(f"- 분석일: {date.today().isoformat()}")
     ap(f"- 촬영 각도: {angle} / 분석 구간: {data['segment']}")
-    ap(f"- 분석 방식: AI 3회 교차 분석 + 코치 검수 (판정 일치율 평균 {agg['mean_agreement']*100:.0f}%)")
+    ap(f"- 분석 방식: AI 3회 교차 분석 (판정 일치율 평균 {agg['mean_agreement']*100:.0f}%)")
     ap("")
     if data["summary"]:
         ap(f"> **한 줄 요약** — {data['summary']}")
@@ -168,7 +168,7 @@ def render_markdown(agg, data):
 
     ap("---")
     ap("")
-    ap("*본 리포트는 AI가 동일 영상을 3회 독립 분석해 일치한 결과만 채택하고, 코치가 최종 검수한 것입니다. "
+    ap("*본 리포트는 AI가 동일 영상을 3회 독립 분석해 일치한 결과만 채택한 것입니다. "
        "영상에 보이지 않는 부분은 추측하지 않으며, 정량 수치(각도·거리)는 제공하지 않습니다.*")
     return "\n".join(lines)
 
@@ -209,7 +209,7 @@ def render_html(agg, data):
        f"<title>{stroke} AI 코칭 리포트</title><style>{HTML_CSS}</style></head><body>")
     ap(f"<h1>🏊 {stroke} AI 코칭 리포트</h1>")
     ap(f"<p class='meta'>분석일 {date.today().isoformat()} · 촬영 각도 {angle} · 분석 구간 {e(data['segment'])}<br>"
-       f"AI 3회 교차 분석 + 코치 검수 · 판정 일치율 평균 {agg['mean_agreement']*100:.0f}%</p>")
+       f"AI 3회 교차 분석 · 판정 일치율 평균 {agg['mean_agreement']*100:.0f}%</p>")
     if data["summary"]:
         ap(f"<div class='summary'>{e(data['summary'])}</div>")
 
@@ -253,7 +253,7 @@ def render_html(agg, data):
             ap(f"<li><b>{ANGLE_KR.get(a, a)} 촬영 추가 시</b>: {e(uniq)}</li>")
         ap("</ul>")
 
-    ap("<footer>본 리포트는 AI가 동일 영상을 3회 독립 분석해 일치한 결과만 채택하고, 코치가 최종 검수한 것입니다. "
+    ap("<footer>본 리포트는 AI가 동일 영상을 3회 독립 분석해 일치한 결과만 채택한 것입니다. "
        "영상에 보이지 않는 부분은 추측하지 않으며, 정량 수치(각도·거리)는 제공하지 않습니다.</footer>")
     ap("</body></html>")
     return "".join(parts)

@@ -15,7 +15,7 @@ export default function Landing({ go }: { go: (p: Page) => void }) {
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-slate-500">
           자유형·배영·평영·접영 4영법 진단. AI가 같은 영상을 3회 독립 분석해 일치한 결과만
-          채택하고, 코치가 검수한 리포트를 24시간 내에 이메일로 보내드립니다.
+          채택한 정밀 리포트를 24시간 내에 이메일로 보내드립니다.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <button
@@ -39,7 +39,7 @@ export default function Landing({ go }: { go: (p: Page) => void }) {
         {[
           { n: '1', t: '영상 업로드', d: '촬영 가이드에 맞춰 찍은 15~30초 수영 영상을 올립니다. 영법과 촬영 각도를 선택하세요.' },
           { n: '2', t: 'AI 3회 교차 분석', d: '동일 영상을 3회 독립 분석해, 3회 모두 일치한 결함만 "확정"으로 채택합니다. 추측 진단은 하지 않습니다.' },
-          { n: '3', t: '검수 후 리포트 발송', d: '코치가 최종 검수한 리포트를 24시간 내 이메일로 발송합니다. 교정 우선순위와 처방 드릴 포함.' },
+          { n: '3', t: '이메일로 리포트 발송', d: 'AI 분석이 완료된 리포트를 24시간 내 이메일로 발송합니다. 교정 우선순위와 처방 드릴 포함.' },
         ].map((s) => (
           <div key={s.n} className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 font-bold text-sky-700">

@@ -120,7 +120,7 @@ export default function UploadForm({ go }: { go: (p: Page) => void }) {
         <div className="text-5xl">✅</div>
         <h1 className="mt-4 text-2xl font-extrabold">접수 완료!</h1>
         <p className="mt-3 text-slate-500">
-          AI 분석과 코치 검수를 거쳐 <b className="text-slate-700">24시간 내</b>에
+          AI 교차 분석을 거쳐 <b className="text-slate-700">24시간 내</b>에
           <br />
           <b className="text-slate-700">{email}</b> 으로 리포트를 보내드립니다.
         </p>
@@ -291,7 +291,7 @@ export default function UploadForm({ go }: { go: (p: Page) => void }) {
         {submitting ? '업로드 중…' : '무료 분석 신청하기'}
       </button>
       <p className="mt-2 text-center text-xs text-slate-400">
-        AI 3회 교차 분석 + 코치 검수 후 24시간 내 이메일 발송
+        AI 3회 교차 분석 진행 후 24시간 내 이메일 발송
       </p>
     </div>
   )
