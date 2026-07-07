@@ -170,7 +170,7 @@ def process_submission(sub_id):
             write_status(sub_dir, "failed", f"리포트 생성 실패: {render.stderr[-300:]}")
             return
 
-        write_status(sub_dir, "ready_for_review")
+        write_status(sub_dir, "completed")
     except subprocess.TimeoutExpired:
         write_status(sub_dir, "failed", "분석 시간 초과(40분)")
     except Exception as e:  # 백그라운드 작업은 어떤 경우에도 상태를 남긴다
@@ -291,12 +291,12 @@ def admin_page(token: str = ""):
     check_token(token)
     rows = []
     state_kr = {"received": "⏳ 접수됨", "analyzing": "🔄 분석 중",
-                "ready_for_review": "✅ 검수 대기", "failed": "❌ 실패"}
+                "completed": "✅ 분석 완료", "failed": "❌ 실패"}
     for s in list_submissions(token):
         m, st = s["meta"], s["status"]
         report_link = (
             f"<a href='/admin/report/{s['id']}?token={html.escape(token)}' target='_blank'>리포트</a>"
-            if st.get("state") == "ready_for_review" else "-"
+            if st.get("state") == "completed" else "-"
         )
         agreement = f"{s['mean_agreement']*100:.0f}%" if s.get("mean_agreement") else "-"
         rows.append(
@@ -309,14 +309,14 @@ def admin_page(token: str = ""):
         )
     body = "".join(rows) or "<tr><td colspan='6'>접수 없음</td></tr>"
     return f"""<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'>
-<title>검수 대기열</title><style>
+<title>분석 리포트 대기열</title><style>
 body{{font-family:sans-serif;max-width:1000px;margin:20px auto;padding:0 12px}}
 table{{border-collapse:collapse;width:100%;font-size:14px}}
 td,th{{border:1px solid #ddd;padding:8px;text-align:left;vertical-align:top}}
 th{{background:#f1f5f9}} small{{color:#888}}
 </style></head><body>
-<h2>🏊 검수 대기열</h2>
-<p><small>새로고침해서 상태를 확인하세요. 검수 완료 후 리포트는 이메일로 수동 발송합니다.</small></p>
+<h2>🏊 분석 리포트 대기열</h2>
+<p><small>새로고침해서 상태를 확인하세요. 분석 완료된 리포트는 이메일로 발송됩니다.</small></p>
 <table><tr><th>접수 ID</th><th>영법/각도/촬영</th><th>이메일</th><th>상태</th><th>집계</th><th>리포트</th></tr>
 {body}</table></body></html>"""
 
