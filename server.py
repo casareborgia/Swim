@@ -68,15 +68,27 @@ def check_rate_limit(ip):
 
 
 def check_credit(email):
-    """이메일당 무료 크레딧 확인 (소진 시 402). 아직 차감하지는 않는다."""
+    """이메일당 무료 크레딧 확인 (소진 시 402). 아직 차감하지는 않는다.
+    
+    [보안 주의]: demo@example.com 우회는 오직 환경변수 ALLOW_DEMO_BYPASS="1"로 
+    명시적 실행된 경우에만 작동합니다. 기본값("0")일 때는 demo 계정도 동일한 크레딧 한도(FREE_CREDITS)가 적용되어 
+    외부 무제한 어뷰징을 차단합니다.
+    """
+    if email == "demo@example.com" and os.environ.get("ALLOW_DEMO_BYPASS", "0") == "1":
+        return
     with _usage_lock:
         usage = read_json(USAGE_FILE, {"emails": {}, "ips": {}})
         if usage["emails"].get(email, 0) >= FREE_CREDITS:
-            raise HTTPException(402, "무료 분석 크레딧을 모두 사용했습니다. 추가 분석은 결제 오픈 후 이용할 수 있습니다.")
+            raise HTTPException(402, "무료 분석 크레딧(1회)을 모두 소진하셨습니다")
 
 
 def consume_credit(email):
-    """검증 통과·접수 확정 시에만 크레딧 차감."""
+    """검증 통과·접수 확정 시에만 크레딧 차감.
+    
+    ALLOW_DEMO_BYPASS="1"일 때만 demo@example.com의 크레딧 차감을 건너뜁니다.
+    """
+    if email == "demo@example.com" and os.environ.get("ALLOW_DEMO_BYPASS", "0") == "1":
+        return
     with _usage_lock:
         usage = read_json(USAGE_FILE, {"emails": {}, "ips": {}})
         usage["emails"][email] = usage["emails"].get(email, 0) + 1
@@ -154,6 +166,11 @@ def process_submission(sub_id):
         "--model", os.environ.get("SWIM_MODEL", "gemini-2.5-pro"),
         "--out-dir", str(analysis_dir),
     ]
+    # 데크(물 밖) 촬영은 키프레임 전처리 필수 (마스터 프롬프트 규칙 11 — 재현성 33%→100% 검증).
+    # kf-mode cycle: 포즈 사이클 정렬 시도, 게이트 미달·mediapipe 부재 시 균일 간격 자동 폴백
+    # (A/B 실측: 자유형측면 3회 일치율 86.7%→96.7%, results/ab_uniform·ab_cycle 참조)
+    if meta.get("shot") == "deck":
+        cmd += ["--keyframes", "--kf-mode", os.environ.get("SWIM_KF_MODE", "cycle")]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=2400,
                               cwd=str(BASE_DIR))
@@ -186,15 +203,15 @@ async def submit(
     angle: str = Form(...),
     shot: str = Form(...),
     target: str = Form(...),
-    email: str = Form(...),
+    email: str = Form("demo@example.com"),
     consent_legal: str = Form(""),
 ):
     # 1) 어뷰징 방어: IP 레이트리밋(시도 자체 카운트) → 크레딧 확인
     check_rate_limit(client_ip(request))
 
     email = (email or "").strip().lower()
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-        raise HTTPException(400, "올바른 이메일을 입력해 주세요")
+    if not email or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        email = "demo@example.com"
     check_credit(email)
 
     # 2) 입력 검증 (enum은 화이트리스트, 자유 텍스트는 새니타이징 후 파라미터로만 사용)
@@ -299,15 +316,25 @@ def admin_page(token: str = ""):
             if st.get("state") == "completed" else "-"
         )
         agreement = f"{s['mean_agreement']*100:.0f}%" if s.get("mean_agreement") else "-"
+        
+        # 검수 승인 버튼
+        if st.get("state") == "completed":
+            if st.get("reviewed"):
+                approve_btn = "✅ 승인 완료"
+            else:
+                approve_btn = f"<button onclick=\"if(confirm('리포트를 승인하시겠습니까?')){{fetch('/api/admin/approve/{s['id']}?token={html.escape(token)}',{{method:'POST'}}).then(r=>r.json()).then(d=>{{if(d.status==='ok'){{location.reload();}}else{{alert(d.detail);}}}})}} \">👍 승인</button>"
+        else:
+            approve_btn = "-"
         rows.append(
             f"<tr><td>{s['id']}</td><td>{m.get('stroke','')}/{m.get('angle','')}/{m.get('shot','')}</td>"
             f"<td>{html.escape(m.get('email',''))}</td>"
             f"<td>{state_kr.get(st.get('state'), st.get('state','?'))}<br>"
             f"<small>{html.escape(st.get('detail',''))}</small></td>"
             f"<td>확정 {s['confirmed']} / 의심 {s['suspect']}<br><small>일치율 {agreement}</small></td>"
-            f"<td>{report_link}</td></tr>"
+            f"<td>{report_link}</td>"
+            f"<td>{approve_btn}</td></tr>"
         )
-    body = "".join(rows) or "<tr><td colspan='6'>접수 없음</td></tr>"
+    body = "".join(rows) or "<tr><td colspan='7'>접수 없음</td></tr>"
     return f"""<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'>
 <title>분석 리포트 대기열</title><style>
 body{{font-family:sans-serif;max-width:1000px;margin:20px auto;padding:0 12px}}
@@ -317,7 +344,7 @@ th{{background:#f1f5f9}} small{{color:#888}}
 </style></head><body>
 <h2>🏊 분석 리포트 대기열</h2>
 <p><small>새로고침해서 상태를 확인하세요. 분석 완료된 리포트는 이메일로 발송됩니다.</small></p>
-<table><tr><th>접수 ID</th><th>영법/각도/촬영</th><th>이메일</th><th>상태</th><th>집계</th><th>리포트</th></tr>
+<table><tr><th>접수 ID</th><th>영법/각도/촬영</th><th>이메일</th><th>상태</th><th>집계</th><th>리포트</th><th>검수 승인</th></tr>
 {body}</table></body></html>"""
 
 
@@ -330,6 +357,60 @@ def admin_report(sub_id: str, token: str = ""):
     if not report.exists():
         raise HTTPException(404, "리포트 없음")
     return FileResponse(report)
+
+
+@app.post("/api/admin/approve/{sub_id}")
+def approve_report(sub_id: str, token: str = ""):
+    check_token(token)
+    if "/" in sub_id or ".." in sub_id:
+        raise HTTPException(400, "잘못된 ID")
+    sub_dir = INBOX_DIR / sub_id
+    status_file = sub_dir / "status.json"
+    if not status_file.exists():
+        raise HTTPException(404, "접수 정보가 없습니다")
+    status = read_json(status_file)
+    status["reviewed"] = True
+    status_file.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"status": "ok", "message": "리포트가 승인되었습니다."}
+
+
+@app.get("/api/status/{sub_id}")
+def get_status(sub_id: str):
+    if "/" in sub_id or ".." in sub_id:
+        raise HTTPException(400, "잘못된 ID")
+    status_file = INBOX_DIR / sub_id / "status.json"
+    if not status_file.exists():
+        raise HTTPException(404, "접수 정보를 찾을 수 없습니다")
+    status_data = read_json(status_file)
+    
+    # 리포트 출력 가능 여부(분석 완료 && (검수완료 혹은 검수우회)) 계산
+    state = status_data.get("state")
+    reviewed = status_data.get("reviewed", False)
+    bypass_review = os.environ.get("BYPASS_REVIEW", "0") == "1"
+    
+    status_data["report_ready"] = (state == "completed") and (bypass_review or reviewed)
+    return status_data
+
+
+@app.get("/api/report/{sub_id}")
+def get_report(sub_id: str):
+    if "/" in sub_id or ".." in sub_id:
+        raise HTTPException(400, "잘못된 ID")
+    
+    status_file = INBOX_DIR / sub_id / "status.json"
+    if not status_file.exists():
+        raise HTTPException(404, "접수 정보를 찾을 수 없습니다")
+    status_data = read_json(status_file)
+    
+    # BYPASS_REVIEW=1 이 아니면 검수 완료(reviewed: true) 여부 체크
+    bypass = os.environ.get("BYPASS_REVIEW", "0") == "1"
+    if not bypass and not status_data.get("reviewed", False):
+        raise HTTPException(403, "리포트가 아직 검수 승인 대기 중입니다.")
+        
+    report_file = INBOX_DIR / sub_id / "analysis" / "report.html"
+    if not report_file.exists():
+        raise HTTPException(404, "리포트가 아직 생성되지 않았거나 없습니다")
+    return FileResponse(report_file)
 
 
 # ---------- 프론트 정적 서빙 (빌드가 있으면) ----------

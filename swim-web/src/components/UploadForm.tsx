@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import type { Page } from '../App'
 
 const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || 'support@example.com'
@@ -27,7 +27,7 @@ export default function UploadForm({ go }: { go: (p: Page) => void }) {
   const [angle, setAngle] = useState('')
   const [shot, setShot] = useState('')
   const [target, setTarget] = useState('')
-  const [email, setEmail] = useState('')
+  const [email] = useState('demo@example.com')
   const [agree, setAgree] = useState(false)
   const [agreeLegal, setAgreeLegal] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -35,7 +35,34 @@ export default function UploadForm({ go }: { go: (p: Page) => void }) {
   const [done, setDone] = useState(false)
   const [paywall, setPaywall] = useState(false)
   const [error, setError] = useState('')
+  const [subId, setSubId] = useState<string | null>(null)
+  const [status, setStatus] = useState<string>('received')
+  const [statusDetail, setStatusDetail] = useState<string>('')
+  const [reportReady, setReportReady] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!subId || !done) return
+
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/status/${subId}`)
+        if (res.ok) {
+          const data = await res.json()
+          setStatus(data.state)
+          setStatusDetail(data.detail || '')
+          setReportReady(!!data.report_ready)
+          if (data.report_ready || data.state === 'failed') {
+            clearInterval(intervalId)
+          }
+        }
+      } catch (err) {
+        console.error('상태 폴링 실패:', err)
+      }
+    }, 3000)
+
+    return () => clearInterval(intervalId)
+  }, [subId, done])
 
   const pickFile = (f: File | undefined | null) => {
     setError('')
@@ -81,7 +108,17 @@ export default function UploadForm({ go }: { go: (p: Page) => void }) {
         setError(body?.detail || `접수에 실패했습니다 (오류 ${res.status}). 잠시 후 다시 시도해 주세요.`)
         return
       }
-      setDone(true)
+      const data = await res.json().catch(() => null)
+      if (data && data.id) {
+        setSubId(data.id)
+        setStatus('received')
+        setStatusDetail('')
+        setReportReady(false)
+        setDone(true)
+      } else {
+        setReportReady(false)
+        setDone(true)
+      }
     } catch {
       setError('접수에 실패했습니다. 잠시 후 다시 시도해 주세요. 문제가 계속되면 이메일로 영상을 보내주셔도 됩니다.')
     } finally {
@@ -115,21 +152,116 @@ export default function UploadForm({ go }: { go: (p: Page) => void }) {
   }
 
   if (done) {
+    const isCompleted = status === 'completed'
+    const isFailed = status === 'failed'
+    const isAnalyzing = status === 'analyzing'
+    const isReceived = status === 'received'
+
     return (
-      <div className="py-24 text-center">
-        <div className="text-5xl">✅</div>
-        <h1 className="mt-4 text-2xl font-extrabold">접수 완료!</h1>
-        <p className="mt-3 text-slate-500">
-          AI 교차 분석을 거쳐 <b className="text-slate-700">24시간 내</b>에
-          <br />
-          <b className="text-slate-700">{email}</b> 으로 리포트를 보내드립니다.
-        </p>
-        <button
-          onClick={() => go('landing')}
-          className="mt-8 rounded-xl border border-slate-300 bg-white px-6 py-2.5 font-semibold text-slate-600 hover:bg-slate-100"
-        >
-          처음으로
-        </button>
+      <div className="py-16 text-center max-w-lg mx-auto">
+        {/* 상단 아이콘/스피너 영역 */}
+        <div className="flex justify-center mb-6">
+          {isCompleted && reportReady && (
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl animate-bounce">
+              🎉
+            </div>
+          )}
+          {isCompleted && !reportReady && (
+            <div className="relative flex h-16 w-16 items-center justify-center">
+              <div className="absolute h-16 w-16 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500"></div>
+              <span className="text-2xl animate-pulse">✍️</span>
+            </div>
+          )}
+          {isFailed && (
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-3xl">
+              ❌
+            </div>
+          )}
+          {(isReceived || isAnalyzing) && (
+            <div className="relative flex h-16 w-16 items-center justify-center">
+              {/* 스피너 */}
+              <div className="absolute h-16 w-16 animate-spin rounded-full border-4 border-slate-200 border-t-sky-600"></div>
+              <span className="text-2xl animate-pulse">🏊‍♂️</span>
+            </div>
+          )}
+        </div>
+
+        {/* 메인 상태 타이틀 */}
+        <h1 className="text-2xl font-extrabold text-slate-800">
+          {isReceived && '영상을 접수했습니다'}
+          {isAnalyzing && 'AI가 영법을 분석 중입니다'}
+          {isCompleted && !reportReady && 'AI 분석 완료 (검수 대기 중)'}
+          {isCompleted && reportReady && 'AI 분석이 완료되었습니다!'}
+          {isFailed && '분석에 실패했습니다'}
+        </h1>
+
+        {/* 상태 설명글 */}
+        <div className="mt-4 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-100 text-sm text-slate-600 leading-relaxed min-h-[70px] flex items-center justify-center">
+          {isReceived && (
+            <p>
+              동영상 업로드가 성공적으로 완료되었습니다.
+              <br />
+              <span className="text-xs text-slate-400 mt-1 block">AI 분석 대기열에 진입하고 있습니다...</span>
+            </p>
+          )}
+          {isAnalyzing && (
+            <p>
+              정밀 분석을 위해 <b>3회 독립 교차 검증</b>을 수행 중입니다.
+              <br />
+              <span className="text-xs text-slate-400 mt-1 block">평균 1~3분 정도 소요되며, 페이지를 닫지 말고 잠시만 대기해 주세요.</span>
+            </p>
+          )}
+          {isCompleted && !reportReady && (
+            <p>
+              AI 분석이 성공적으로 마무리되었습니다.
+              <br />
+              <span className="text-xs text-sky-600 font-semibold mt-1 block">현재 수영 코치가 리포트 초안을 검수 중입니다. 승인 시 바로 리포트가 열립니다.</span>
+            </p>
+          )}
+          {isCompleted && reportReady && (
+            <p>
+              교차 일치율이 확보된 신뢰성 높은 수영 코칭 리포트가 생성되었습니다.
+              <br />
+              <span className="text-xs text-slate-400 mt-1 block">아래 버튼을 눌러 리포트를 즉시 확인해 보세요!</span>
+            </p>
+          )}
+          {isFailed && (
+            <p>
+              {statusDetail || '알 수 없는 요인으로 분석이 중단되었습니다.'}
+              <br />
+              <span className="text-xs text-rose-500 mt-1 block">관리자 문의 또는 다른 영상으로 다시 시도해 주세요.</span>
+            </p>
+          )}
+        </div>
+
+        {/* 액션 버튼 */}
+        <div className="mt-8 flex flex-col gap-3 justify-center items-center">
+          {isCompleted && reportReady && (
+            <button
+              onClick={() => window.open(`/api/report/${subId}`, '_blank')}
+              className="w-full max-w-xs rounded-xl bg-sky-600 py-3.5 px-6 font-bold text-white shadow-lg shadow-sky-200 transition hover:bg-sky-700 hover:shadow-sky-300 transform active:scale-95 animate-pulse"
+            >
+              📊 진단 리포트 즉시 확인하기
+            </button>
+          )}
+          {isCompleted && !reportReady && (
+            <button
+              disabled
+              className="w-full max-w-xs rounded-xl bg-slate-300 py-3.5 px-6 font-bold text-slate-500 cursor-not-allowed shadow-none"
+            >
+              ⏳ 전문가 검수 완료 대기 중...
+            </button>
+          )}
+          
+          <button
+            onClick={() => go('landing')}
+            className={`w-full max-w-xs rounded-xl border border-slate-300 bg-white py-3 px-6 font-semibold text-slate-600 hover:bg-slate-100 transition ${
+              isCompleted ? 'text-xs text-slate-400 border-none hover:bg-transparent underline' : ''
+            }`}
+          >
+            {isCompleted ? '처음 화면으로 돌아가기' : '이전으로'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -245,18 +377,6 @@ export default function UploadForm({ go }: { go: (p: Page) => void }) {
         />
       </div>
 
-      {/* 이메일 */}
-      <div className="mt-5">
-        <label className="text-sm font-bold">리포트 받을 이메일</label>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          type="email"
-          placeholder="you@example.com"
-          className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-sky-500"
-        />
-      </div>
-
       {/* 동의 */}
       <label className="mt-5 flex items-start gap-2 text-sm text-slate-500">
         <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1" />
@@ -291,7 +411,7 @@ export default function UploadForm({ go }: { go: (p: Page) => void }) {
         {submitting ? '업로드 중…' : '무료 분석 신청하기'}
       </button>
       <p className="mt-2 text-center text-xs text-slate-400">
-        AI 3회 교차 분석 진행 후 24시간 내 이메일 발송
+        AI 3회 교차 분석 진행 후 즉시 결과 리포트 제공
       </p>
     </div>
   )

@@ -21,6 +21,9 @@ coaching_schema_*.json
 HANDOFF*.md
 analyze.py
 swim_analyze.py
+pose_keyframes.py
+pose_verify*.py
+작업지시서*.md
 
 # ===== 빌드 / 환경 =====
 node_modules/
@@ -34,7 +37,12 @@ __pycache__/
 *.log
 .venv/
 venv/
+.pose_venv/
 *.egg-info/
 .env.local
 security_report_*.md
+pose_verify_results/
+pose_landmarker_*.task
+keyframe_sample.jpg
+test_hcx005_defect_check.py
 
